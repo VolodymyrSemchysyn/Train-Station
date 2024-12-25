@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from rest_framework.exceptions import ValidationError
 
 
 class Crew(models.Model):
@@ -60,6 +61,34 @@ class Ticket(models.Model):
     def __str__(self):
         return (f"{self.cargo}, {self.seat}, "
                 f"{self.journey} {self.order}")
+
+    @staticmethod
+    def validate_ticket(cargo, seat, train, error_to_raise=ValidationError):
+        if not (1 <= cargo <= train.cargo_num):
+            raise error_to_raise(
+                {"cargo": f"Cargo number must be between 1 and {train.cargo_num}."}
+            )
+        if not (1 <= seat <= train.number_of_seats):
+            raise error_to_raise(
+                {"seat": f"Seat number must be between 1 and {train.number_of_seats}."}
+            )
+
+    def clean(self):
+        Ticket.validate_ticket(
+            self.cargo,
+            self.seat,
+            self.journey.train,
+            ValidationError,
+        )
+
+    def save(
+            self, force_insert=False, force_update=False, using=None, update_fields=None
+    ):
+        self.full_clean()
+        return super().save(force_insert, force_update, using, update_fields)
+
+    class Meta:
+        unique_together = ("cargo", "seat", "journey")
 
 
 class Station(models.Model):
