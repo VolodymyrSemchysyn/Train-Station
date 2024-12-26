@@ -16,7 +16,9 @@ from train_station_system.serializers import (
     TrainListSerializer,
     JourneySerializer,
     JourneyCreateSerializer,
-    OrderListSerializer, TrainTypeSerializer, TicketListSerializer
+    OrderListSerializer,
+    TrainTypeSerializer,
+    TicketListSerializer
 )
 
 
@@ -89,7 +91,7 @@ class JourneyViewSet(viewsets.ModelViewSet):
                 raise ValidationError({"train": "Train does not exist."})
 
         queryset = queryset.annotate(
-            available_seats=F("train__number_of_seats") - Count("tickets")
+            available_seats=F("train__cargo_num") * F("train__places_in_cargo") - Count("tickets")
         )
 
         return queryset
