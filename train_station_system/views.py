@@ -2,6 +2,7 @@ from datetime import datetime
 
 from django.core.serializers import get_serializer
 from django.db.models import F, Count
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework import viewsets, mixins, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -75,6 +76,23 @@ class TrainViewSet(
         if self.action == "upload_image":
             return TrainImageUploadSerializer
         return TrainSerializer
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                "train_type",
+                type=str,
+                description="Filter by train type",
+            ),
+            OpenApiParameter(
+                "station",
+                type=str,
+                description="Filter by station"
+            ),
+        ]
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
     @action(
         methods=["POST"],
