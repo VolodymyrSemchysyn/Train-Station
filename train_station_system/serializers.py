@@ -50,6 +50,19 @@ class TrainListSerializer(serializers.ModelSerializer):
         fields = ("id", "name", "train_type")
 
 
+class TrainImageUploadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Train
+        fields = ['image']
+
+    def update(self, instance, validated_data):
+        image = validated_data.get('image')
+        if image:
+            instance.image = image
+            instance.save()
+        return instance
+
+
 class RouteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Route

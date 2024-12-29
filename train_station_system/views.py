@@ -1,12 +1,24 @@
 from datetime import datetime
 
 from django.db.models import F, Count
-from rest_framework import viewsets, mixins
+from rest_framework import viewsets, mixins, status
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAdminUser
+from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
-from train_station_system.models import Crew, Station, Route, Order, Train, Journey, TrainType, Ticket
+from train_station_system.models import (
+    Crew,
+    Station,
+    Route,
+    Order,
+    Train,
+    Journey,
+    TrainType,
+    Ticket
+)
 from train_station_system.serializers import (
     CrewSerializer,
     StationSerializer,
@@ -18,7 +30,8 @@ from train_station_system.serializers import (
     JourneyCreateSerializer,
     OrderListSerializer,
     TrainTypeSerializer,
-    TicketListSerializer
+    TicketListSerializer,
+    TrainImageUploadSerializer
 )
 
 
@@ -61,6 +74,20 @@ class TrainViewSet(
 
         return TrainSerializer
 
+    @action(
+        methods=["POST"],
+        detail=True,
+        url_path="upload-image",
+        permission_classes=[IsAdminUser],
+    )
+    def upload_image(self, request, pk=None):
+        train = self.get_object()
+        serializer = TrainImageUploadSerializer(train, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class JourneyViewSet(viewsets.ModelViewSet):
     queryset = Journey.objects.all().select_related("route", "train").prefetch_related("crew")
@@ -69,7 +96,7 @@ class JourneyViewSet(viewsets.ModelViewSet):
 
     @staticmethod
     def _params_to_ints(qs):
-        return [int(str_id) for str_id in qs.split(",")]
+        return [int(param.strip()) for param in qs.split(",")]
 
     def get_queryset(self):
         source = self.request.query_params.get("source")
@@ -85,10 +112,10 @@ class JourneyViewSet(viewsets.ModelViewSet):
 
         if train_id:
             try:
-                train = Train.objects.get(id=train_id)
-                queryset = queryset.filter(train=train)
-            except Train.DoesNotExist:
-                raise ValidationError({"train": "Train does not exist."})
+                train_ids_list = self._params_to_ints(train_id)
+                queryset = queryset.filter(train__id__in=train_ids_list)
+            except ValueError:
+                raise ValidationError({"train": "Train IDs must be integers."})
 
         queryset = queryset.annotate(
             available_seats=F("train__cargo_num") * F("train__places_in_cargo") - Count("tickets")
