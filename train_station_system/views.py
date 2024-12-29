@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from django.core.serializers import get_serializer
 from django.db.models import F, Count
 from rest_framework import viewsets, mixins, status
 from rest_framework.decorators import action
@@ -71,7 +72,8 @@ class TrainViewSet(
     def get_serializer_class(self):
         if self.action == "list":
             return TrainListSerializer
-
+        if self.action == "upload_image":
+            return TrainImageUploadSerializer
         return TrainSerializer
 
     @action(
@@ -82,7 +84,7 @@ class TrainViewSet(
     )
     def upload_image(self, request, pk=None):
         train = self.get_object()
-        serializer = TrainImageUploadSerializer(train, data=request.data)
+        serializer = self.get_serializer(train, data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
