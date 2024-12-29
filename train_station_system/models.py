@@ -1,5 +1,9 @@
+import os
+import uuid
+
 from django.conf import settings
 from django.db import models
+from django.utils.text import slugify
 from rest_framework.exceptions import ValidationError
 
 
@@ -11,6 +15,12 @@ class Crew(models.Model):
         return f"{self.first_name} {self.last_name}"
 
 
+def train_image_file_path(instance, filename):
+    _, extension = os.path.splitext(filename)
+    filename = f"{slugify(instance.name)}-{uuid.uuid4()}{extension}"
+    return os.path.join("uploads/trains/", filename)
+
+
 class Train(models.Model):
     name = models.CharField(max_length=55)
     cargo_num = models.IntegerField()
@@ -20,6 +30,7 @@ class Train(models.Model):
         on_delete=models.CASCADE,
         related_name="trains"
     )
+    image = models.ImageField(null=True, upload_to=train_image_file_path)
 
     def __str__(self):
         return f"{self.name} {self.cargo_num}"
@@ -108,12 +119,12 @@ class Route(models.Model):
     source = models.ForeignKey(
         "Station",
         on_delete=models.CASCADE,
-        related_name="routes"
+        related_name="routes_source"
     )
     destination = models.ForeignKey(
         "Station",
         on_delete=models.CASCADE,
-        related_name="routes"
+        related_name="routes_destination"
     )
     distance = models.IntegerField()
 

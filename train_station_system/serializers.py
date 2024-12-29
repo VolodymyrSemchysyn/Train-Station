@@ -32,7 +32,7 @@ class TrainTypeSerializer(serializers.ModelSerializer):
 
 
 class TrainSerializer(serializers.ModelSerializer):
-    train_type = TrainTypeSerializer(read_only=True)
+    train_type = TrainTypeSerializer(read_only=False)
 
     class Meta:
         model = Train
@@ -40,7 +40,7 @@ class TrainSerializer(serializers.ModelSerializer):
             "name",
             "cargo_num",
             "places_in_cargo",
-            "train_type"
+            "train_type",
         )
 
 
