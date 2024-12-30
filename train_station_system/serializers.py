@@ -19,7 +19,7 @@ class CrewSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Crew
-        fields = ("full_name",)
+        fields = ("first_name", "last_name", "full_name",)
 
     def get_full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}"
@@ -32,7 +32,7 @@ class TrainTypeSerializer(serializers.ModelSerializer):
 
 
 class TrainSerializer(serializers.ModelSerializer):
-    train_type = TrainTypeSerializer(read_only=False)
+    train_type = serializers.PrimaryKeyRelatedField(queryset=TrainType.objects.all())
 
     class Meta:
         model = Train
@@ -53,10 +53,10 @@ class TrainListSerializer(serializers.ModelSerializer):
 class TrainImageUploadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Train
-        fields = ['image']
+        fields = ["image"]
 
     def update(self, instance, validated_data):
-        image = validated_data.get('image')
+        image = validated_data.get("image")
         if image:
             instance.image = image
             instance.save()
@@ -93,7 +93,7 @@ class JourneyCreateSerializer(JourneySerializer):
 
 class TicketSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
-        data = super(TicketSerializer, self).validate(attrs)
+        data = super().validate(attrs)
         Ticket.validate_ticket(
             attrs["cargo"],
             attrs["seat"],
@@ -104,7 +104,7 @@ class TicketSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Ticket
-        fields = ("id", "cargo", "seat", "journey", "order")
+        fields = ("id", "cargo", "seat", "journey")
 
 
 class TicketListSerializer(TicketSerializer):
@@ -122,8 +122,15 @@ class OrderSerializer(serializers.ModelSerializer):
         with transaction.atomic():
             tickets_data = validated_data.pop("tickets")
             order = Order.objects.create(**validated_data)
+            tickets_to_create = []
             for ticket_data in tickets_data:
-                Ticket.objects.create(order=order, **ticket_data)
+                ticket = Ticket(
+                    order=order,
+                    **ticket_data
+                )
+                ticket.full_clean()
+                tickets_to_create.append(ticket)
+            Ticket.objects.bulk_create(tickets_to_create)
             return order
 
 
