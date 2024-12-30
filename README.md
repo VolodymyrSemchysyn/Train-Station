@@ -59,6 +59,6 @@ and the differentiation of users based on their permissions or rights.
 ```
 
 ## Database Structure
-![db.png](media/uploads/db.png)
+![db.png](db.png)
 ## Home page
-![img_1.png](media/uploads/img_1.png)
+![img_1.png](img_1.png)
