@@ -1,4 +1,6 @@
 import time
+import traceback
+
 from django.core.management.base import BaseCommand
 from django.db import connection
 from django.db.utils import OperationalError
@@ -13,6 +15,7 @@ class Command(BaseCommand):
                 connection.ensure_connection()
                 db_up = True
             except OperationalError:
+                traceback.print_exc()
                 self.stdout.write(
                     "Database unavailable, please waiting for 5 second..."
                 )
