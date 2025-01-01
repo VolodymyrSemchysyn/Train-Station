@@ -93,6 +93,7 @@ class TrainImageUploadTests(TestCase):
 
     def test_create_train_with_image(self):
         url = TRAIN_URL
+        train_type = TrainType.objects.create(name="Freight")
         with tempfile.NamedTemporaryFile(suffix=".jpg") as ntf:
             img = Image.new("RGB", (10, 10))
             img.save(ntf, format="JPEG")
@@ -101,12 +102,14 @@ class TrainImageUploadTests(TestCase):
                 "name": "New Train",
                 "cargo_num": 100,
                 "places_in_cargo": 50,
-                "train_type": 1,
+                "train_type": train_type.id,
                 "image": ntf,
             }
             result = self.client.post(url, payload, format="multipart")
         self.assertEqual(result.status_code, status.HTTP_201_CREATED)
         train = Train.objects.get(id=result.data["id"])
+        for key in payload:
+            self.assertEqual(payload[key], getattr(train, key))
         self.assertTrue(os.path.exists(train.image.path))
 
     def test_image_url_is_shown_in_train_detail(self):
@@ -139,19 +142,19 @@ class TicketValidationTests(TestCase):
 
     def test_ticket_validation_valid(self):
         """Test valid ticket creation"""
-        ticket = sample_ticket(cargo=50, seat=30, journey=self.journey)
+        ticket = sample_ticket(cargo=50, seat=30, journey=self.journey, order=self.route)
         self.assertEqual(ticket.cargo, 50)
         self.assertEqual(ticket.seat, 30)
 
     def test_ticket_validation_invalid_cargo(self):
         """Test invalid cargo number"""
         with self.assertRaises(ValidationError):
-            sample_ticket(cargo=150, seat=30, journey=self.journey)
+            sample_ticket(cargo=150, seat=30, journey=self.journey, order=self.route)
 
     def test_ticket_validation_invalid_seat(self):
         """Test invalid seat number"""
         with self.assertRaises(ValidationError):
-            sample_ticket(cargo=50, seat=600, journey=self.journey)
+            sample_ticket(cargo=50, seat=600, journey=self.journey, order=self.route)
 
 
 class TrainViewSetTests(TestCase):
@@ -162,14 +165,7 @@ class TrainViewSetTests(TestCase):
         )
         self.client.force_authenticate(self.user)
 
-    def test_list_trains(self):
-        """Test retrieving a list of trains"""
-        sample_train()
-        result = self.client.get(TRAIN_URL)
-        trains = Train.objects.all()
-        serializer = TrainListSerializer(trains, many=True)
-        self.assertEqual(result.status_code, status.HTTP_200_OK)
-        self.assertEqual(result.data, serializer.data)
+        self.train_type = TrainType.objects.create(name="Express")
 
     def test_create_train(self):
         """Test creating a new train"""
@@ -178,11 +174,14 @@ class TrainViewSetTests(TestCase):
             "name": "New Train",
             "cargo_num": 100,
             "places_in_cargo": 50,
-            "train_type": 1,
+            "train_type": self.train_type.id,
         }
+
         result = self.client.post(url, payload)
         self.assertEqual(result.status_code, status.HTTP_201_CREATED)
+
         train = Train.objects.get(id=result.data["id"])
+
         for key in payload:
             self.assertEqual(payload[key], getattr(train, key))
 

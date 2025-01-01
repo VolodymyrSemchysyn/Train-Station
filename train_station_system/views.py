@@ -18,6 +18,7 @@ from train_station_system.models import (
     TrainType,
     Ticket
 )
+from train_station_system.permissions import IsAdminOrIfAuthenticatedReadOnly
 from train_station_system.serializers import (
     CrewSerializer,
     StationSerializer,
@@ -41,6 +42,7 @@ class CrewViewSet(
 ):
     queryset = Crew.objects.all()
     serializer_class = CrewSerializer
+    permission_classes = (IsAdminOrIfAuthenticatedReadOnly,)
 
 
 class StationViewSet(
@@ -50,6 +52,7 @@ class StationViewSet(
 ):
     queryset = Station.objects.all()
     serializer_class = StationSerializer
+    permission_classes = (IsAdminOrIfAuthenticatedReadOnly,)
 
 
 class RouteViewSet(mixins.CreateModelMixin,
@@ -58,6 +61,7 @@ class RouteViewSet(mixins.CreateModelMixin,
                    ):
     queryset = Route.objects.select_related("source", "destination")
     serializer_class = RouteSerializer
+    permission_classes = (IsAdminOrIfAuthenticatedReadOnly,)
 
 
 class TrainViewSet(
@@ -66,6 +70,7 @@ class TrainViewSet(
     GenericViewSet
 ):
     queryset = Train.objects.select_related("train_type")
+    permission_classes = (IsAdminOrIfAuthenticatedReadOnly,)
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -101,7 +106,7 @@ class TrainViewSet(
 class JourneyViewSet(viewsets.ModelViewSet):
     queryset = Journey.objects.all().select_related("route", "train").prefetch_related("crew")
 
-    # permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAdminOrIfAuthenticatedReadOnly,)
 
     @staticmethod
     def _params_to_ints(qs):
@@ -152,6 +157,7 @@ class OrderViewSet(
     queryset = Order.objects.select_related("user").prefetch_related("tickets")
     serializer_class = OrderSerializer
     pagination_class = OrderPagination
+    permission_classes = (IsAuthenticated,)
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -169,8 +175,10 @@ class TrainTypeViewSet(
 ):
     queryset = TrainType.objects.all()
     serializer_class = TrainTypeSerializer
+    permission_classes = [IsAdminOrIfAuthenticatedReadOnly]
 
 
 class TicketViewSet(mixins.ListModelMixin, GenericViewSet):
     queryset = Ticket.objects.select_related("order", "journey")
     serializer_class = TicketListSerializer
+    permission_classes = [IsAdminOrIfAuthenticatedReadOnly]
