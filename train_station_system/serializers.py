@@ -37,6 +37,7 @@ class TrainSerializer(serializers.ModelSerializer):
     class Meta:
         model = Train
         fields = (
+            "id",
             "name",
             "cargo_num",
             "places_in_cargo",
@@ -66,7 +67,7 @@ class TrainImageUploadSerializer(serializers.ModelSerializer):
 class RouteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Route
-        fields = ("source", "destination", "distance")
+        fields = ("id", "source", "destination", "distance")
 
 
 class JourneySerializer(serializers.ModelSerializer):
@@ -77,6 +78,7 @@ class JourneySerializer(serializers.ModelSerializer):
     class Meta:
         model = Journey
         fields = (
+            "id",
             "route",
             "train",
             "departure_time",

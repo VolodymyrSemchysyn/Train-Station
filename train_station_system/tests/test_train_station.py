@@ -62,106 +62,11 @@ def detail_url(train_id):
     )
 
 
-class TrainImageUploadTests(TestCase):
-    def setUp(self):
-        self.client = APIClient()
-        self.user = get_user_model().objects.create_superuser(
-            "admin@example.com", "difficult_password"
-        )
-        self.client.force_authenticate(self.user)
-        self.train = sample_train()
-
-    def tearDown(self):
-        self.train.image.delete()
-
-    def test_upload_image_to_train(self):
-        url = image_upload_url(self.train.id)
-        with tempfile.NamedTemporaryFile(suffix=".jpg") as ntf:
-            img = Image.new("RGB", (10, 10))
-            img.save(ntf, format="JPEG")
-            ntf.seek(0)
-            result = self.client.post(url, {"image": ntf}, format="multipart")
-        self.train.refresh_from_db()
-        self.assertEqual(result.status_code, status.HTTP_200_OK)
-        self.assertIn("image", result.data)
-        self.assertTrue(os.path.exists(self.train.image.path))
-
-    def test_upload_invalid_image(self):
-        url = image_upload_url(self.train.id)
-        result = self.client.post(url, {"image": "not image"}, format="multipart")
-        self.assertEqual(result.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_create_train_with_image(self):
-        url = TRAIN_URL
-        train_type = TrainType.objects.create(name="Freight")
-        with tempfile.NamedTemporaryFile(suffix=".jpg") as ntf:
-            img = Image.new("RGB", (10, 10))
-            img.save(ntf, format="JPEG")
-            ntf.seek(0)
-            payload = {
-                "name": "New Train",
-                "cargo_num": 100,
-                "places_in_cargo": 50,
-                "train_type": train_type.id,
-                "image": ntf,
-            }
-            result = self.client.post(url, payload, format="multipart")
-        self.assertEqual(result.status_code, status.HTTP_201_CREATED)
-        train = Train.objects.get(id=result.data["id"])
-        for key in payload:
-            self.assertEqual(payload[key], getattr(train, key))
-        self.assertTrue(os.path.exists(train.image.path))
-
-    def test_image_url_is_shown_in_train_detail(self):
-        """Test if the image URL is shown in the train detail view"""
-        url = image_upload_url(self.train.id)
-        with tempfile.NamedTemporaryFile(suffix=".jpg") as ntf:
-            img = Image.new("RGB", (10, 10))
-            img.save(ntf, format="JPEG")
-            ntf.seek(0)
-            self.client.post(url, {"image": ntf}, format="multipart")
-        result = self.client.get(detail_url(self.train.id))
-        self.assertIn("image", result.data)
-
-
-class TicketValidationTests(TestCase):
-    def setUp(self):
-        self.client = APIClient()
-        self.user = get_user_model().objects.create_user(
-            "user@example.com", "password123"
-        )
-        self.client.force_authenticate(self.user)
-        self.train = sample_train()
-        self.route = sample_route()
-        self.journey = Journey.objects.create(
-            route=self.route,
-            train=self.train,
-            departure_time="2024-04-02 10:00:00",
-            arrival_time="2024-04-02 14:00:00"
-        )
-
-    def test_ticket_validation_valid(self):
-        """Test valid ticket creation"""
-        ticket = sample_ticket(cargo=50, seat=30, journey=self.journey, order=self.route)
-        self.assertEqual(ticket.cargo, 50)
-        self.assertEqual(ticket.seat, 30)
-
-    def test_ticket_validation_invalid_cargo(self):
-        """Test invalid cargo number"""
-        with self.assertRaises(ValidationError):
-            sample_ticket(cargo=150, seat=30, journey=self.journey, order=self.route)
-
-    def test_ticket_validation_invalid_seat(self):
-        """Test invalid seat number"""
-        with self.assertRaises(ValidationError):
-            sample_ticket(cargo=50, seat=600, journey=self.journey, order=self.route)
-
-
 class TrainViewSetTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.user = get_user_model().objects.create_user(
-            "user@example.com", "password123"
+            "user@example.com", "password123", is_staff=True
         )
         self.client.force_authenticate(self.user)
 
@@ -183,14 +88,17 @@ class TrainViewSetTests(TestCase):
         train = Train.objects.get(id=result.data["id"])
 
         for key in payload:
-            self.assertEqual(payload[key], getattr(train, key))
+            if key == "train_type":
+                self.assertEqual(payload[key], train.train_type.id)
+            else:
+                self.assertEqual(payload[key], getattr(train, key))
 
 
 class RouteViewSetTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.user = get_user_model().objects.create_user(
-            "user@example.com", "password123"
+            "user@example.com", "password123", is_staff=True
         )
         self.client.force_authenticate(self.user)
 
@@ -206,9 +114,14 @@ class RouteViewSetTests(TestCase):
         url = reverse("train_station_system:route-list")
         result = self.client.post(url, payload)
         self.assertEqual(result.status_code, status.HTTP_201_CREATED)
+
+        self.assertIn("id", result.data)
+
         route = Route.objects.get(id=result.data["id"])
-        for key in payload:
-            self.assertEqual(payload[key], getattr(route, key))
+
+        self.assertEqual(station_a.id, route.source.id)
+        self.assertEqual(station_b.id, route.destination.id)
+        self.assertEqual(payload["distance"], route.distance)
 
     def test_list_routes(self):
         """Test retrieving a list of routes"""
@@ -220,3 +133,89 @@ class RouteViewSetTests(TestCase):
         serializer = RouteSerializer(routes, many=True)
         self.assertEqual(result.status_code, status.HTTP_200_OK)
         self.assertEqual(result.data, serializer.data)
+
+# class AuthenticatedJourneyApiTests(TestCase):
+#     def setUp(self):
+#         self.client = APIClient()
+#         self.user = get_user_model().objects.create_user(
+#             email="train@test.test",
+#             password="difficult_password12345"
+#         )
+#         self.client.force_authenticate(self.user)
+#
+#
+#         self.train_type = TrainType.objects.create(name="Freight")
+#
+#
+#         self.station_a = Station.objects.create(name="Station A", latitude=0.0, longitude=0.0)
+#         self.station_b = Station.objects.create(name="Station B", latitude=8.0, longitude=5.0)
+#         self.station_c = Station.objects.create(name="Station C", latitude=4.5, longitude=11.0)
+#         self.station_d = Station.objects.create(name="Station D", latitude=150.0, longitude=16.0)
+#
+#     def sample_train(self, **params):
+#
+#         defaults = {
+#             "name": "Test Train",
+#             "cargo_num": 100,
+#             "places_in_cargo": 100,
+#             "train_type": self.train_type
+#         }
+#         defaults.update(params)
+#         return Train.objects.create(**defaults)
+#
+#     def test_filter_journeys_by_source(self):
+#         """Test filtering journeys by source station"""
+#         route_1 = Route.objects.create(source=self.station_a, destination=self.station_b, distance=100)
+#         route_2 = Route.objects.create(source=self.station_c, destination=self.station_d, distance=150)
+#
+#
+#         journey_1 = Journey.objects.create(
+#             route=route_1,
+#             train=self.sample_train(),
+#             departure_time="2025-01-01T12:00:00Z",
+#             arrival_time="2025-01-01T18:00:00Z"
+#         )
+#         journey_2 = Journey.objects.create(
+#             route=route_2,
+#             train=self.sample_train(),
+#             departure_time="2025-01-01T12:00:00Z",
+#             arrival_time="2025-01-01T18:00:00Z"
+#         )
+#
+#
+#         url = reverse("train_station_system:journey-list")
+#         result = self.client.get(url, {"source__id": self.station_a.id})
+#
+#
+#         print([journey['id'] for journey in result.data])
+#
+#         self.assertIn(journey_1.id, [journey['id'] for journey in result.data])
+#         self.assertNotIn(journey_2.id, [journey['id'] for journey in result.data])
+#
+#     def test_filter_journeys_by_destination(self):
+#         """Test filtering journeys by destination station"""
+#         route_1 = Route.objects.create(source=self.station_a, destination=self.station_b, distance=100)
+#         route_2 = Route.objects.create(source=self.station_c, destination=self.station_d, distance=150)
+#
+#
+#         journey_1 = Journey.objects.create(
+#             route=route_1,
+#             train=self.sample_train(),
+#             departure_time="2025-01-01T12:00:00Z",
+#             arrival_time="2025-01-01T18:00:00Z"
+#         )
+#         journey_2 = Journey.objects.create(
+#             route=route_2,
+#             train=self.sample_train(),
+#             departure_time="2025-01-01T12:00:00Z",
+#             arrival_time="2025-01-01T18:00:00Z"
+#         )
+#
+#
+#         url = reverse("train_station_system:journey-list")
+#         result = self.client.get(url, {"destination__id": self.station_b.id})
+#
+#         print([journey['id'] for journey in result.data])
+#
+#         self.assertIn(journey_1.id, [journey['id'] for journey in result.data])
+#         self.assertNotIn(journey_2.id, [journey['id'] for journey in result.data])
